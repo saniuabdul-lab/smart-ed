@@ -20,36 +20,33 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
     }
-
     router.push("/dashboard");
     router.refresh();
   };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel */}
       <div className="hidden lg:flex flex-col w-[45%] bg-gray-900 p-10 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(13,122,107,0.15),transparent_70%)]" />
         <Logo size="md" />
         <div className="flex-1 flex flex-col justify-center relative z-10">
           <h2 className="text-4xl font-bold text-white leading-tight mb-6">
-            AI-Powered Academic Excellence<br />
+            AI-Powered Academic Excellence
+            <br />
             <span className="text-teal-400 italic">for Nigerian Schools</span>
           </h2>
           <p className="text-white/50 text-base leading-relaxed mb-8">
             Generate curricula, lesson plans, schemes of work and assessments
-            aligned to NERDC and British Curriculum — in minutes.
+            aligned to NERDC and British Curriculum in minutes.
           </p>
           {[
             "Nursery 1 to SS3 support",
@@ -59,7 +56,16 @@ export default function LoginPage() {
           ].map((item) => (
             <div key={item} className="flex items-center gap-3 mb-3">
               <div className="w-5 h-5 rounded-full bg-teal-600/30 border border-teal-500/40 flex items-center justify-center flex-shrink-0">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4DD9C0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#4DD9C0"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
@@ -68,30 +74,87 @@ export default function LoginPage() {
           ))}
         </div>
         <p className="text-white/20 text-xs relative z-10">
-          © 2025 SMART-ED Technologies Ltd.
+          2025 SMART-ED Technologies Ltd.
         </p>
       </div>
 
-      {/* Right form */}
       <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8">
             <Logo />
           </div>
-
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             Welcome back
           </h1>
           <p className="text-gray-500 text-sm mb-8">
             Log in to your SMART-ED dashboard
           </p>
-
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600 mb-6">
               {error}
             </div>
           )}
-
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="teacher@yourschool.edu.ng"
+                required
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-teal-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your password"
+                  required
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-teal-500 transition-colors pr-11"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="flex justify-end mt-1.5">
+                <span className="text-xs text-teal-600 cursor-pointer hover:underline font-medium">
+                  Forgot password?
+                </span>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              {loading ? "Logging in..." : "Log In to Dashboard"}
+            </button>
+            <p className="text-center text-sm text-gray-500">
+              Do not have an account?{" "}
+              <Link
+                href="/signup"
+                className="text-teal-600 font-semibold hover:underline"
+              >
+                Create one free
+              </Link>
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
