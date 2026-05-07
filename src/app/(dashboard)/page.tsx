@@ -8,17 +8,20 @@ import {
   Lightbulb,
   ClipboardList,
   Lock,
-  TrendingUp,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -72,6 +75,9 @@ export default async function DashboardPage() {
     "Bloom's Taxonomy Assessment",
   ];
 
+  const displayName = profile?.name || user.email?.split("@")[0] || "Educator";
+  const schoolName = profile?.school_name || "My School";
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Welcome banner */}
@@ -83,15 +89,13 @@ export default async function DashboardPage() {
               Welcome back
             </p>
             <h2 className="text-2xl font-bold text-white mb-3">
-              {profile?.name || "Educator"}
+              {displayName}
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
               <span className="bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold px-3 py-1 rounded-full">
-                ● Free Plan Active
+                Free Plan Active
               </span>
-              <span className="text-white/30 text-sm">
-                {profile?.school_name || "My School"}
-              </span>
+              <span className="text-white/30 text-sm">{schoolName}</span>
             </div>
           </div>
           <div className="flex gap-3">
@@ -113,7 +117,7 @@ export default async function DashboardPage() {
       {/* Quick actions */}
       <div>
         <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">
-          Quick Start
+          Generate Documents
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action) => {
@@ -122,7 +126,7 @@ export default async function DashboardPage() {
               <Link
                 key={action.href}
                 href={action.href}
-                className={`p-5 rounded-xl border-2 bg-white hover:shadow-md transition-all group ${action.color}`}
+                className={`p-5 rounded-xl border-2 bg-white hover:shadow-md transition-all ${action.color}`}
               >
                 <Icon size={22} className="mb-3" />
                 <p className="font-bold text-gray-900 text-sm mb-1">
@@ -157,7 +161,7 @@ export default async function DashboardPage() {
                         {doc.title}
                       </p>
                       <p className="text-xs text-gray-400 capitalize">
-                        {doc.type} ·{" "}
+                        {doc.type} —{" "}
                         {new Date(doc.created_at).toLocaleDateString("en-NG")}
                       </p>
                     </div>
@@ -175,11 +179,18 @@ export default async function DashboardPage() {
               <p className="text-gray-300 text-xs mt-1">
                 Generate your first document to see it here
               </p>
+              <Link
+                href="/dashboard/curriculum"
+                className="inline-flex items-center gap-2 mt-4 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                <Sparkles size={12} />
+                Generate First Document
+              </Link>
             </div>
           )}
         </div>
 
-        {/* Locked features + tip */}
+        {/* Sidebar */}
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h3 className="font-bold text-gray-900 text-sm mb-4">
@@ -200,11 +211,33 @@ export default async function DashboardPage() {
           </div>
 
           <div className="bg-teal-50 border border-teal-100 rounded-2xl p-5">
-            <p className="text-xs font-bold text-teal-700 mb-2">💡 Pro Tip</p>
+            <p className="text-xs font-bold text-teal-700 mb-2">Pro Tip</p>
             <p className="text-xs text-gray-600 leading-relaxed">
-              Generate your First Term Scheme of Work first — it becomes
-              the master plan for all your lesson plans.
+              Generate your First Term Scheme of Work first — it becomes the
+              master plan for all your lesson plans.
             </p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <h3 className="font-bold text-gray-900 text-sm mb-3">
+              Your Account
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Email</span>
+                <span className="text-gray-700 font-medium truncate ml-2">
+                  {user.email}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Plan</span>
+                <span className="text-teal-600 font-bold">Free</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">School</span>
+                <span className="text-gray-700 font-medium">{schoolName}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
