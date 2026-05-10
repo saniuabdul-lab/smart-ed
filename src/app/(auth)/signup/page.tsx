@@ -61,12 +61,11 @@ export default function SignupPage() {
       }
 
       if (data?.user) {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push("/dashboard");
-          router.refresh();
-        }, 2000);
-      } else {
+  setSuccess(true);
+  setTimeout(() => {
+    window.location.href = "/dashboard";
+  }, 2000);
+} else {
         setError("Something went wrong. Please try again.");
         setLoading(false);
       }
