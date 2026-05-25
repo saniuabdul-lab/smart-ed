@@ -1,15 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/shared/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,20 +17,35 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
-      setError(error.message);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        window.location.replace("/dashboard/overview");
+      } else {
+        setError("Login failed. Please try again.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
       setLoading(false);
-      return;
     }
-    window.location.href = "/dashboard";
   };
 
   return (
     <div className="min-h-screen flex">
+      {/* Left panel */}
       <div className="hidden lg:flex flex-col w-[45%] bg-gray-900 p-10 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(13,122,107,0.15),transparent_70%)]" />
         <Logo size="md" />
@@ -77,6 +89,7 @@ export default function LoginPage() {
         </p>
       </div>
 
+      {/* Right form */}
       <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8">
@@ -88,11 +101,13 @@ export default function LoginPage() {
           <p className="text-gray-500 text-sm mb-8">
             Log in to your SMART-ED dashboard
           </p>
+
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600 mb-6">
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 mb-6">
               {error}
             </div>
           )}
+
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
@@ -125,7 +140,11 @@ export default function LoginPage() {
                   onClick={() => setShowPassword((s) => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? (
+                    <EyeOff size={16} />
+                  ) : (
+                    <Eye size={16} />
+                  )}
                 </button>
               </div>
               <div className="flex justify-end mt-1.5">
@@ -139,7 +158,9 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              {loading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : null}
               {loading ? "Logging in..." : "Log In to Dashboard"}
             </button>
             <p className="text-center text-sm text-gray-500">

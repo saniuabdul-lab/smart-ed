@@ -63,7 +63,7 @@ export default function SignupPage() {
       if (data?.user) {
   setSuccess(true);
   setTimeout(() => {
-    window.location.href = "/dashboard";
+    window.location.href = "/dashboard/overview";
   }, 2000);
 } else {
         setError("Something went wrong. Please try again.");
