@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage } from "@/lib/usage";
 import { buildPrompt } from "@/lib/ai/prompts";
 
 export async function POST(request: Request) {
   try {
-    // Check OpenAI key exists
-    if (!process.env.OPENAI_API_KEY) {
+    // Check Gemini key exists
+    if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
-        { error: "OpenAI API key not configured" },
+        { error: "Gemini API key not configured. Please add GEMINI_API_KEY to your environment variables." },
         { status: 500 }
       );
     }
 
     // Check Supabase config
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ) {
       return NextResponse.json(
-        { error: "Supabase not configured" },
+        { error: "Supabase not configured." },
         { status: 500 }
       );
     }
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
 
     if (!type || !classLevel || !subject) {
       return NextResponse.json(
-        { error: "Missing required fields: type, classLevel, subject" },
+        { error: "Missing required fields: type, classLevel and subject are required." },
         { status: 400 }
       );
     }
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "FREE_LIMIT_REACHED",
-          message: "You have reached your free limit for this tool. Upgrade to continue.",
+          message: "You have reached your free limit for this tool. Upgrade to Pro to continue.",
           remaining: 0,
         },
         { status: 429 }
@@ -70,30 +73,32 @@ export async function POST(request: Request) {
       topic,
     });
 
-    // Call OpenAI
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    // Call Gemini
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.7,
+        maxOutputTokens: 3000,
+      },
     });
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert Nigerian curriculum specialist with deep knowledge of NERDC guidelines, the British National Curriculum, and Nigerian school standards. You generate professional, accurate, and detailed educational documents. Always respond with valid JSON only. No markdown formatting, no code blocks, just pure JSON.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 3000,
-    });
+    const systemInstruction = `You are an expert Nigerian curriculum specialist with deep knowledge of:
+- NERDC (Nigerian Educational Research and Development Council) guidelines
+- The British National Curriculum standards
+- Nigerian primary and secondary school standards from Nursery 1 to SS3
+- Professional lesson planning using the ABCD Behavioural Objective Method
+- Nigerian school context, culture and available resources
 
-    const content = completion.choices[0].message.content;
+You generate professional, accurate, detailed and practical educational documents.
+Always respond with valid JSON only. No markdown formatting, no code blocks, no explanations. Just pure valid JSON.`;
+
+    const fullPrompt = `${systemInstruction}\n\n${prompt}`;
+
+    const result = await model.generateContent(fullPrompt);
+    const response = await result.response;
+    const content = response.text();
 
     if (!content) {
       return NextResponse.json(
@@ -102,9 +107,15 @@ export async function POST(request: Request) {
       );
     }
 
-    let result;
+    // Parse JSON response
+    let parsedResult;
     try {
-      result = JSON.parse(content);
+      // Clean the response in case there is any markdown
+      const cleaned = content
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+      parsedResult = JSON.parse(cleaned);
     } catch {
       return NextResponse.json(
         { error: "Failed to parse AI response. Please try again." },
@@ -122,15 +133,15 @@ export async function POST(request: Request) {
         subject,
         curriculum: curriculum || "nigerian",
         term: term || null,
-        content: result,
+        content: parsedResult,
       });
     } catch (dbError) {
       console.error("Database save error:", dbError);
-      // Continue even if save fails — return the result to the user
+      // Continue even if save fails
     }
 
     return NextResponse.json({
-      result,
+      result: parsedResult,
       remaining: remaining - 1,
       success: true,
     });
@@ -138,25 +149,24 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Generate API error:", error);
 
-    // Handle specific OpenAI errors
-    if (error?.status === 401) {
+    if (error?.message?.includes("API key")) {
       return NextResponse.json(
-        { error: "Invalid OpenAI API key. Please check your configuration." },
+        { error: "Invalid Gemini API key. Please check your configuration." },
         { status: 500 }
       );
     }
 
-    if (error?.status === 429) {
+    if (error?.message?.includes("quota") || error?.message?.includes("rate")) {
       return NextResponse.json(
-        { error: "OpenAI rate limit reached. Please wait a moment and try again." },
+        { error: "AI rate limit reached. Please wait a moment and try again." },
         { status: 429 }
       );
     }
 
-    if (error?.code === "insufficient_quota") {
+    if (error?.message?.includes("SAFETY")) {
       return NextResponse.json(
-        { error: "OpenAI quota exceeded. Please check your OpenAI billing." },
-        { status: 500 }
+        { error: "Content was blocked by safety filters. Please modify your request and try again." },
+        { status: 400 }
       );
     }
 
