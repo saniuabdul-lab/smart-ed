@@ -1,33 +1,37 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
 export async function GET() {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json({
         status: "error",
-        message: "GEMINI_API_KEY is not set in environment variables",
+        message: "GROQ_API_KEY is not set in environment variables",
       });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+    const groq = new Groq({ apiKey });
+
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "user",
+          content: "Say hello in JSON format like this: {\"message\": \"hello\"}",
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 50,
     });
 
-    const result = await model.generateContent(
-      "Say hello in one word. Respond with JSON like this: {\"message\": \"hello\"}"
-    );
-
-    const response = await result.response;
-    const text = response.text();
+    const content = completion.choices[0].message.content;
 
     return NextResponse.json({
       status: "success",
-      message: "Gemini is working correctly",
-      response: text,
+      message: "Groq is working correctly",
+      response: content,
       keyPrefix: apiKey.substring(0, 8) + "...",
     });
 
@@ -35,7 +39,6 @@ export async function GET() {
     return NextResponse.json({
       status: "error",
       message: error.message,
-      code: error.code || "unknown",
     });
   }
 }

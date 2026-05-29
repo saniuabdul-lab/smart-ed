@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage } from "@/lib/usage";
 import { buildPrompt } from "@/lib/ai/prompts";
 
 export async function POST(request: Request) {
   try {
-    // Check Gemini key exists
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       return NextResponse.json(
-        { error: "Gemini API key not configured. Please add GEMINI_API_KEY to your environment variables." },
+        { error: "GROQ_API_KEY is not configured." },
         { status: 500 }
       );
     }
 
-    // Check Supabase config
     if (
       !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -47,7 +45,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check and enforce free tier limits
     const { allowed, remaining } = await checkAndIncrementUsage(
       user.id,
       type
@@ -57,14 +54,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "FREE_LIMIT_REACHED",
-          message: "You have reached your free limit for this tool. Upgrade to Pro to continue.",
+          message: "You have reached your free limit. Upgrade to Pro to continue.",
           remaining: 0,
         },
         { status: 429 }
       );
     }
 
-    // Build prompt
     const prompt = buildPrompt(type, {
       classLevel,
       subject,
@@ -73,32 +69,36 @@ export async function POST(request: Request) {
       topic,
     });
 
-    // Call Gemini
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-        maxOutputTokens: 3000,
-      },
+    const groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
     });
 
-    const systemInstruction = `You are an expert Nigerian curriculum specialist with deep knowledge of:
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert Nigerian curriculum specialist with deep knowledge of:
 - NERDC (Nigerian Educational Research and Development Council) guidelines
-- The British National Curriculum standards
+- The British National Curriculum standards  
 - Nigerian primary and secondary school standards from Nursery 1 to SS3
 - Professional lesson planning using the ABCD Behavioural Objective Method
 - Nigerian school context, culture and available resources
 
 You generate professional, accurate, detailed and practical educational documents.
-Always respond with valid JSON only. No markdown formatting, no code blocks, no explanations. Just pure valid JSON.`;
+Always respond with valid JSON only. No markdown formatting, no code blocks, no explanations. Just pure valid JSON.`,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 3000,
+      response_format: { type: "json_object" },
+    });
 
-    const fullPrompt = `${systemInstruction}\n\n${prompt}`;
-
-    const result = await model.generateContent(fullPrompt);
-    const response = await result.response;
-    const content = response.text();
+    const content = completion.choices[0].message.content;
 
     if (!content) {
       return NextResponse.json(
@@ -107,10 +107,8 @@ Always respond with valid JSON only. No markdown formatting, no code blocks, no 
       );
     }
 
-    // Parse JSON response
     let parsedResult;
     try {
-      // Clean the response in case there is any markdown
       const cleaned = content
         .replace(/```json/g, "")
         .replace(/```/g, "")
@@ -123,7 +121,6 @@ Always respond with valid JSON only. No markdown formatting, no code blocks, no 
       );
     }
 
-    // Save to database
     try {
       await supabase.from("documents").insert({
         user_id: user.id,
@@ -137,7 +134,6 @@ Always respond with valid JSON only. No markdown formatting, no code blocks, no 
       });
     } catch (dbError) {
       console.error("Database save error:", dbError);
-      // Continue even if save fails
     }
 
     return NextResponse.json({
@@ -149,24 +145,17 @@ Always respond with valid JSON only. No markdown formatting, no code blocks, no 
   } catch (error: any) {
     console.error("Generate API error:", error);
 
-    if (error?.message?.includes("API key")) {
+    if (error?.message?.includes("rate_limit") || error?.message?.includes("429")) {
       return NextResponse.json(
-        { error: "Invalid Gemini API key. Please check your configuration." },
-        { status: 500 }
-      );
-    }
-
-    if (error?.message?.includes("quota") || error?.message?.includes("rate")) {
-      return NextResponse.json(
-        { error: "AI rate limit reached. Please wait a moment and try again." },
+        { error: "Rate limit reached. Please wait a moment and try again." },
         { status: 429 }
       );
     }
 
-    if (error?.message?.includes("SAFETY")) {
+    if (error?.message?.includes("API key") || error?.message?.includes("auth")) {
       return NextResponse.json(
-        { error: "Content was blocked by safety filters. Please modify your request and try again." },
-        { status: 400 }
+        { error: "Invalid API key. Please check your configuration." },
+        { status: 500 }
       );
     }
 
