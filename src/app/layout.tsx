@@ -1,19 +1,24 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import { redirect } from "next/navigation";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "SMART-ED — AI-Powered School Planning",
-  description: "AI-Powered Curriculum and Lesson Planning for Nigerian Schools",
-};
-
-export default function RootLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = await createServerSupabaseClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
+    <div className="min-h-screen bg-gray-50">
+      {children}
+    </div>
   );
 }
