@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePaystackPayment } from "react-paystack";
 import { Check, Crown, Zap, Building } from "lucide-react";
 
 const plans = [
@@ -72,48 +71,6 @@ const plans = [
   },
 ];
 
-interface PaystackButtonProps {
-  plan: (typeof plans)[0];
-  userEmail: string;
-  onSuccess: (reference: string, plan: string) => void;
-}
-
-function PaystackButton({
-  plan,
-  userEmail,
-  onSuccess,
-}: PaystackButtonProps) {
-  const config = {
-    reference: `smarted_${plan.value}_${new Date().getTime()}`,
-    email: userEmail,
-    amount: plan.price * 100,
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "",
-    currency: "NGN",
-  };
-
-  const initializePayment = usePaystackPayment(config);
-
-  const handlePayment = () => {
-    initializePayment({
-      onSuccess: (transaction: any) => {
-        onSuccess(transaction.reference, plan.value);
-      },
-      onClose: () => {
-        console.log("Payment closed");
-      },
-    });
-  };
-
-  return (
-    <button
-      onClick={handlePayment}
-      className={`w-full font-bold py-3.5 rounded-xl text-sm transition-colors ${plan.buttonColor}`}
-    >
-      Upgrade to {plan.name} — ₦{plan.price.toLocaleString()}
-    </button>
-  );
-}
-
 export default function UpgradePage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -123,45 +80,86 @@ export default function UpgradePage() {
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
     if (email) setUserEmail(email);
+
+    // Load Paystack inline script
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
   }, []);
 
-  const handlePaymentSuccess = async (
-    reference: string,
-    plan: string
-  ) => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/payment/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference, plan }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSuccess(
-          `Successfully upgraded to ${plan} plan! Redirecting...`
-        );
-        setTimeout(() => {
-          window.location.href = "/dashboard/overview";
-        }, 2000);
-      } else {
-        setError(
-          data.error ||
-            "Payment verification failed. Please contact support."
-        );
-      }
-    } catch {
-      setError(
-        "Network error. Please contact support with reference: " +
-          reference
-      );
-    } finally {
-      setLoading(false);
+  const handlePayment = (plan: (typeof plans)[0]) => {
+    if (plan.price === 0) {
+      window.location.href = "mailto:hello@smarted.ng?subject=Enterprise Plan Enquiry";
+      return;
     }
+
+    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+
+    if (!publicKey) {
+      setError("Payment configuration error. Please contact support.");
+      return;
+    }
+
+    const reference = `smarted_${plan.value}_${new Date().getTime()}`;
+
+    const handler = (window as any).PaystackPop.setup({
+      key: publicKey,
+      email: userEmail,
+      amount: plan.price * 100,
+      currency: "NGN",
+      ref: reference,
+      metadata: {
+        plan: plan.value,
+        plan_name: plan.name,
+      },
+      callback: async (response: any) => {
+        setLoading(true);
+        setError("");
+
+        try {
+          const res = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reference: response.reference,
+              plan: plan.value,
+            }),
+          });
+
+          const data = await res.json();
+
+          if (data.success) {
+            setSuccess(
+              `Successfully upgraded to ${plan.name} plan! Redirecting...`
+            );
+            setTimeout(() => {
+              window.location.href = "/dashboard/overview";
+            }, 2000);
+          } else {
+            setError(
+              data.error || "Payment verification failed. Please contact support."
+            );
+          }
+        } catch {
+          setError(
+            "Network error. Please contact support with reference: " +
+              response.reference
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      onClose: () => {
+        console.log("Payment window closed");
+      },
+    });
+
+    handler.openIframe();
   };
 
   return (
@@ -196,7 +194,7 @@ export default function UpgradePage() {
 
         {loading && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8 text-center text-blue-700 font-semibold">
-            Verifying your payment...
+            Verifying your payment please wait...
           </div>
         )}
 
@@ -263,20 +261,14 @@ export default function UpgradePage() {
                     ))}
                   </div>
 
-                  {plan.price > 0 ? (
-                    <PaystackButton
-                      plan={plan}
-                      userEmail={userEmail}
-                      onSuccess={handlePaymentSuccess}
-                    />
-                  ) : (
-                    
-                     <a href="mailto:hello@smarted.ng"
-                      className={`block w-full text-center font-bold py-3.5 rounded-xl text-sm transition-colors ${plan.buttonColor}`}
-                    >
-                      Contact Sales
-                    </a>
-                  )}
+                  <button
+                    onClick={() => handlePayment(plan)}
+                    className={`w-full font-bold py-3.5 rounded-xl text-sm transition-colors ${plan.buttonColor}`}
+                  >
+                    {plan.price > 0
+                      ? `Upgrade to ${plan.name} — ₦${plan.price.toLocaleString()}`
+                      : "Contact Sales"}
+                  </button>
                 </div>
               </div>
             );
