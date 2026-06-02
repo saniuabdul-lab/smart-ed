@@ -1,24 +1,30 @@
-import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
+import "./globals.css";
 
-export default async function DashboardLayout({
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-jakarta",
+});
+
+export const metadata: Metadata = {
+  title: "SMART-ED — AI-Powered School Planning for Nigerian Schools",
+  description:
+    "Generate curricula, lesson plans, schemes of work and assessments aligned to NERDC and British Curriculum.",
+};
+
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createServerSupabaseClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {children}
-    </div>
+    <html lang="en" className={jakarta.variable}>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body className="antialiased">{children}</body>
+    </html>
   );
 }
