@@ -212,11 +212,6 @@ export default function UpgradePage() {
           </p>
         </div>
 
-        {/* Debug info - remove this section once working */}
-        <div className="bg-gray-100 border border-gray-300 rounded-xl p-3 mb-6 text-center text-xs text-gray-600">
-          Status: {scriptLoaded ? "✅ Payment system ready" : "⏳ Loading payment system..."}
-          {debugInfo && <span> — {debugInfo}</span>}
-        </div>
 
         {success && (
           <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-8 text-center text-teal-700 font-semibold">
