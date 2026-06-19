@@ -76,90 +76,122 @@ export default function UpgradePage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [userEmail, setUserEmail] = useState("user@smarted.ng");
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
     const email = localStorage.getItem("userEmail");
     if (email) setUserEmail(email);
 
-    // Load Paystack inline script
+    // Check if script already exists
+    if ((window as any).PaystackPop) {
+      setScriptLoaded(true);
+      setDebugInfo("Paystack script already loaded");
+      return;
+    }
+
     const script = document.createElement("script");
     script.src = "https://js.paystack.co/v1/inline.js";
     script.async = true;
-    document.body.appendChild(script);
 
-    return () => {
-      document.body.removeChild(script);
+    script.onload = () => {
+      setScriptLoaded(true);
+      setDebugInfo("Paystack script loaded successfully");
     };
+
+    script.onerror = () => {
+      setError("Failed to load payment system. Please refresh the page and try again.");
+      setDebugInfo("Paystack script failed to load");
+    };
+
+    document.body.appendChild(script);
   }, []);
 
   const handlePayment = (plan: (typeof plans)[0]) => {
+    setError("");
+
     if (plan.price === 0) {
-      window.location.href = "mailto:hello@smarted.ng?subject=Enterprise Plan Enquiry";
+      window.location.href =
+        "mailto:hello@smarted.ng?subject=Enterprise Plan Enquiry";
       return;
     }
 
     const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
 
     if (!publicKey) {
-      setError("Payment configuration error. Please contact support.");
+      setError(
+        "Payment configuration error: Paystack public key is missing. Please contact support."
+      );
+      return;
+    }
+
+    if (!scriptLoaded || !(window as any).PaystackPop) {
+      setError(
+        "Payment system is still loading. Please wait a moment and try again."
+      );
       return;
     }
 
     const reference = `smarted_${plan.value}_${new Date().getTime()}`;
 
-    const handler = (window as any).PaystackPop.setup({
-      key: publicKey,
-      email: userEmail,
-      amount: plan.price * 100,
-      currency: "NGN",
-      ref: reference,
-      metadata: {
-        plan: plan.value,
-        plan_name: plan.name,
-      },
-      callback: async (response: any) => {
-        setLoading(true);
-        setError("");
+    try {
+      const handler = (window as any).PaystackPop.setup({
+        key: publicKey,
+        email: userEmail,
+        amount: plan.price * 100,
+        currency: "NGN",
+        ref: reference,
+        metadata: {
+          plan: plan.value,
+          plan_name: plan.name,
+        },
+        callback: function (response: any) {
+          setLoading(true);
+          setError("");
 
-        try {
-          const res = await fetch("/api/payment/verify", {
+          fetch("/api/payment/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               reference: response.reference,
               plan: plan.value,
             }),
-          });
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success) {
+                setSuccess(
+                  `Successfully upgraded to ${plan.name} plan! Redirecting...`
+                );
+                setTimeout(() => {
+                  window.location.href = "/dashboard/overview";
+                }, 2000);
+              } else {
+                setError(
+                  data.error ||
+                    "Payment verification failed. Please contact support."
+                );
+              }
+            })
+            .catch(() => {
+              setError(
+                "Network error during verification. Reference: " +
+                  response.reference
+              );
+            })
+            .finally(() => {
+              setLoading(false);
+            });
+        },
+        onClose: function () {
+          setDebugInfo("Payment window was closed by user");
+        },
+      });
 
-          const data = await res.json();
-
-          if (data.success) {
-            setSuccess(
-              `Successfully upgraded to ${plan.name} plan! Redirecting...`
-            );
-            setTimeout(() => {
-              window.location.href = "/dashboard/overview";
-            }, 2000);
-          } else {
-            setError(
-              data.error || "Payment verification failed. Please contact support."
-            );
-          }
-        } catch {
-          setError(
-            "Network error. Please contact support with reference: " +
-              response.reference
-          );
-        } finally {
-          setLoading(false);
-        }
-      },
-      onClose: () => {
-        console.log("Payment window closed");
-      },
-    });
-
-    handler.openIframe();
+      handler.openIframe();
+    } catch (err: any) {
+      setError("Error opening payment window: " + err.message);
+    }
   };
 
   return (
@@ -178,6 +210,12 @@ export default function UpgradePage() {
           <p className="text-gray-500 text-lg">
             Choose the plan that works for your school
           </p>
+        </div>
+
+        {/* Debug info - remove this section once working */}
+        <div className="bg-gray-100 border border-gray-300 rounded-xl p-3 mb-6 text-center text-xs text-gray-600">
+          Status: {scriptLoaded ? "✅ Payment system ready" : "⏳ Loading payment system..."}
+          {debugInfo && <span> — {debugInfo}</span>}
         </div>
 
         {success && (
@@ -262,8 +300,10 @@ export default function UpgradePage() {
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => handlePayment(plan)}
-                    className={`w-full font-bold py-3.5 rounded-xl text-sm transition-colors ${plan.buttonColor}`}
+                    disabled={plan.price > 0 && !scriptLoaded}
+                    className={`w-full font-bold py-3.5 rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${plan.buttonColor}`}
                   >
                     {plan.price > 0
                       ? `Upgrade to ${plan.name} — ₦${plan.price.toLocaleString()}`
