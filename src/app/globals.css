@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -15,4 +13,7 @@ html, body {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-family: system-ui, sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
 }
