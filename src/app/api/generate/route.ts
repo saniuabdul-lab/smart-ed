@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     });
 
     const completion = await groq.chat.completions.create({
-      model: "qwen-qwq-32b",
+      model: "GPT OSS 120B / Qwen3.6 27B",
       messages: [
         {
           role: "system",

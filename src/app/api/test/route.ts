@@ -15,7 +15,7 @@ export async function GET() {
     const groq = new Groq({ apiKey });
 
     const completion = await groq.chat.completions.create({
-      model: "qwen-qwq-32b",
+      model: "GPT OSS 120B / Qwen3.6 27B",
       messages: [
         {
           role: "user",
